@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
 pub(crate) fn prompt_with_default(message: &str, default: &str) -> io::Result<String> {
-    let input = prompt(&format!("{message} [{default}]: "))?;
+    let input = prompt_line(&format!("{message} [{default}]: "))?;
     if input.trim().is_empty() {
         Ok(default.to_string())
     } else {
@@ -15,7 +15,7 @@ pub(crate) fn prompt_usize_with_default(
     range: std::ops::RangeInclusive<usize>,
 ) -> io::Result<usize> {
     loop {
-        let input = prompt(&format!("{message} [{default}]: "))?;
+        let input = prompt_line(&format!("{message} [{default}]: "))?;
         let value = if input.trim().is_empty() {
             default
         } else {
@@ -37,7 +37,7 @@ pub(crate) fn prompt_usize_with_default(
 pub(crate) fn prompt_yes_no(message: &str, default: bool) -> io::Result<bool> {
     let suffix = if default { "[Y/n]" } else { "[y/N]" };
     loop {
-        let input = prompt(&format!("{message} {suffix}: "))?;
+        let input = prompt_line(&format!("{message} {suffix}: "))?;
         let trimmed = input.trim().to_ascii_lowercase();
         if trimmed.is_empty() {
             return Ok(default);
@@ -50,7 +50,7 @@ pub(crate) fn prompt_yes_no(message: &str, default: bool) -> io::Result<bool> {
     }
 }
 
-fn prompt(message: &str) -> io::Result<String> {
+pub(crate) fn prompt_line(message: &str) -> io::Result<String> {
     print!("{message}");
     io::stdout().flush()?;
     let mut input = String::new();

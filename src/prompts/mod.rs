@@ -1,4 +1,4 @@
-mod input;
+pub(crate) mod input;
 mod install_dir;
 mod memory;
 mod version;

@@ -7,11 +7,13 @@ use reqwest::blocking::Client;
 use sha2::{Digest, Sha256};
 
 mod prompts;
+mod setup;
 mod version;
 
 use prompts::{
     confirm_existing_install, prompt_install_dir, prompt_memory, prompt_version, prompt_yes_no,
 };
+use setup::run_setup;
 use version::{VersionInfo, fetch_versions};
 
 #[derive(Debug)]
@@ -30,7 +32,12 @@ fn main() {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-    if std::env::args().skip(1).any(|arg| arg == "--update") {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|arg| arg == "--setup") {
+        run_setup()?;
+        return Ok(());
+    }
+    if args.iter().any(|arg| arg == "--update") {
         println!("アップデート機能は未対応です。新規インストールのみ対応しています。");
         return Ok(());
     }
