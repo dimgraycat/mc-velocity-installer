@@ -165,3 +165,48 @@ fn display_item(item: Option<&Item>) -> Option<String> {
     }
     Some(value.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn doc(input: &str) -> DocumentMut {
+        input.parse::<DocumentMut>().expect("parse toml")
+    }
+
+    #[test]
+    fn summarize_changes_reports_key_updates() {
+        let before = doc(r#"
+bind = "0.0.0.0:25565"
+
+[servers]
+lobby = "127.0.0.1:30066"
+try = ["lobby"]
+"#);
+        let after = doc(r#"
+bind = "0.0.0.0:25566"
+
+[servers]
+lobby = "127.0.0.1:30066"
+pvp = "127.0.0.1:30067"
+try = ["lobby", "pvp"]
+"#);
+
+        let changes = summarize_changes(&before, &after);
+        assert!(
+            changes
+                .iter()
+                .any(|line| line.contains("bind: 0.0.0.0:25565 -> 0.0.0.0:25566"))
+        );
+        assert!(
+            changes
+                .iter()
+                .any(|line| line.contains("servers: 追加 pvp = 127.0.0.1:30067"))
+        );
+        assert!(
+            changes
+                .iter()
+                .any(|line| line.contains("servers.try: [lobby] -> [lobby, pvp]"))
+        );
+    }
+}

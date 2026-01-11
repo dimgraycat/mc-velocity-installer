@@ -14,7 +14,7 @@ use prompts::{
     confirm_existing_install, prompt_install_dir, prompt_memory, prompt_version, prompt_yes_no,
 };
 use setup::run_setup;
-use version::{VersionInfo, fetch_versions};
+use version::{VERSION_INDEX_URL, VersionInfo, fetch_versions};
 
 #[derive(Debug)]
 struct InstallSettings {
@@ -57,7 +57,9 @@ fn run() -> Result<(), Box<dyn Error>> {
         .build()?;
 
     println!("Velocity のバージョン一覧を取得しています...");
-    let versions = fetch_versions(&client)?;
+    let index_url =
+        std::env::var("MC_VELOCITY_INDEX_URL").unwrap_or_else(|_| VERSION_INDEX_URL.to_string());
+    let versions = fetch_versions(&client, &index_url)?;
     let version = prompt_version(&versions)?;
 
     let (xms, xmx) = prompt_memory()?;
