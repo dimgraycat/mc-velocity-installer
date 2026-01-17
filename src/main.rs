@@ -106,12 +106,12 @@ fn print_help() {
     let name = binary_name();
     println!(
         "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --setup            velocity.toml を対話式に編集します\n  --redownload-jar   jar のみ再取得します\n  --update           未対応（新規インストールのみ対応）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
-        env!("CARGO_PKG_VERSION"),
+        build_version(),
     );
 }
 
 fn print_version() {
-    println!("{} {}", binary_name(), env!("CARGO_PKG_VERSION"));
+    println!("{} {}", binary_name(), build_version());
 }
 
 fn binary_name() -> String {
@@ -124,6 +124,13 @@ fn binary_name() -> String {
         })
         .filter(|name| !name.is_empty())
         .unwrap_or_else(|| "mc-velocity-installer".to_string())
+}
+
+fn build_version() -> String {
+    option_env!("MC_VELOCITY_BUILD_VERSION")
+        .filter(|version| !version.trim().is_empty())
+        .unwrap_or(env!("CARGO_PKG_VERSION"))
+        .to_string()
 }
 
 fn print_summary(settings: &InstallSettings) {
