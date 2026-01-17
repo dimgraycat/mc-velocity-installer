@@ -37,6 +37,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         run_setup()?;
         return Ok(());
     }
+    if args.iter().any(|arg| arg == "--redownload-jar") {
+        run_redownload_jar()?;
+        return Ok(());
+    }
     if args.iter().any(|arg| arg == "--update") {
         println!("アップデート機能は未対応です。新規インストールのみ対応しています。");
         return Ok(());
@@ -52,9 +56,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let client = Client::builder()
-        .user_agent("mc-velocity-installer")
-        .build()?;
+    let client = build_client()?;
 
     println!("Velocity のバージョン一覧を取得しています...");
     let index_url =
@@ -104,6 +106,15 @@ fn print_summary(settings: &InstallSettings) {
     println!("- 設定ファイルは初回起動時に生成されます");
 }
 
+fn print_redownload_summary(install_dir: &Path, version: &VersionInfo, jar_name: &str) {
+    println!();
+    println!("設定サマリ:");
+    println!("- インストール先: {}", install_dir.display());
+    println!("- バージョン: {} ({})", version.version, version.kind);
+    println!("- 再取得する jar: {jar_name}");
+    println!("- 既存のスクリプトや設定は変更しません");
+}
+
 fn perform_install(client: &Client, settings: &InstallSettings) -> Result<(), Box<dyn Error>> {
     if !settings.install_dir.exists() {
         fs::create_dir_all(&settings.install_dir)?;
@@ -116,6 +127,43 @@ fn perform_install(client: &Client, settings: &InstallSettings) -> Result<(), Bo
 
     write_start_scripts(settings, &jar_name)?;
     write_systemd_service(settings)?;
+    Ok(())
+}
+
+fn run_redownload_jar() -> Result<(), Box<dyn Error>> {
+    println!("mc-velocity-installer (jar再取得)");
+    println!("Java はインストール済みであることを前提に進めます。");
+    println!();
+
+    let install_dir = prompt_install_dir()?;
+    if !confirm_existing_install(&install_dir)? {
+        println!("中断しました。");
+        return Ok(());
+    }
+
+    let client = build_client()?;
+    println!("Velocity のバージョン一覧を取得しています...");
+    let index_url =
+        std::env::var("MC_VELOCITY_INDEX_URL").unwrap_or_else(|_| VERSION_INDEX_URL.to_string());
+    let versions = fetch_versions(&client, &index_url)?;
+    let version = prompt_version(&versions)?;
+
+    let jar_name = jar_filename_from_url(&version.url, &version.version);
+    print_redownload_summary(&install_dir, &version, &jar_name);
+    if !prompt_yes_no("この内容で再取得しますか？", true)? {
+        println!("中断しました。");
+        return Ok(());
+    }
+
+    if !install_dir.exists() {
+        fs::create_dir_all(&install_dir)?;
+    }
+
+    let jar_path = install_dir.join(&jar_name);
+    println!("ダウンロード中: {}", version.url);
+    download_with_sha256(&client, &version, &jar_path)?;
+    println!();
+    println!("完了しました。");
     Ok(())
 }
 
@@ -147,6 +195,12 @@ fn download_with_sha256(
         .into());
     }
     Ok(())
+}
+
+fn build_client() -> Result<Client, Box<dyn Error>> {
+    Ok(Client::builder()
+        .user_agent("mc-velocity-installer")
+        .build()?)
 }
 
 fn write_start_scripts(settings: &InstallSettings, jar_name: &str) -> Result<(), Box<dyn Error>> {

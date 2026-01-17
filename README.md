@@ -20,6 +20,12 @@ cargo run
 cargo run -- --setup
 ```
 
+jar のみ再取得:
+
+```bash
+cargo run -- --redownload-jar
+```
+
 変更がある場合は保存前に変更点を表示します。
 
 ### 対話の流れ（概要）
@@ -41,6 +47,7 @@ cargo run -- --setup
 ## オプション
 
 - `--setup` で `velocity.toml` を対話式に編集できます（項目ごとにスキップ/削除が可能）。
+- `--redownload-jar` は jar のみ再取得します（スクリプトや設定は変更しません）。
 - `--update` は未対応です。指定された場合は案内メッセージを出して終了します。
 
 ## 詳細仕様
