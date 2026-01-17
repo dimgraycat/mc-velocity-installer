@@ -33,6 +33,14 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        print_help();
+        return Ok(());
+    }
+    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
+        print_version();
+        return Ok(());
+    }
     if args.iter().any(|arg| arg == "--setup") {
         run_setup()?;
         return Ok(());
@@ -46,7 +54,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    println!("mc-velocity-installer (新規インストール)");
+    println!("{} (新規インストール)", binary_name());
     println!("Java はインストール済みであることを前提に進めます。");
     println!();
 
@@ -94,6 +102,30 @@ fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn print_help() {
+    let name = binary_name();
+    println!(
+        "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --setup            velocity.toml を対話式に編集します\n  --redownload-jar   jar のみ再取得します\n  --update           未対応（新規インストールのみ対応）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
+        env!("CARGO_PKG_VERSION"),
+    );
+}
+
+fn print_version() {
+    println!("{} {}", binary_name(), env!("CARGO_PKG_VERSION"));
+}
+
+fn binary_name() -> String {
+    std::env::args()
+        .next()
+        .and_then(|arg0| {
+            Path::new(&arg0)
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+        })
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "mc-velocity-installer".to_string())
+}
+
 fn print_summary(settings: &InstallSettings) {
     println!();
     println!("設定サマリ:");
@@ -131,7 +163,7 @@ fn perform_install(client: &Client, settings: &InstallSettings) -> Result<(), Bo
 }
 
 fn run_redownload_jar() -> Result<(), Box<dyn Error>> {
-    println!("mc-velocity-installer (jar再取得)");
+    println!("{} (jar再取得)", binary_name());
     println!("Java はインストール済みであることを前提に進めます。");
     println!();
 
