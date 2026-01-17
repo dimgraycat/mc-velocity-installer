@@ -3,7 +3,7 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use reqwest::blocking::Client;
+use reqwest::{Url, blocking::Client};
 use sha2::{Digest, Sha256};
 
 mod prompts;
@@ -109,11 +109,13 @@ fn perform_install(client: &Client, settings: &InstallSettings) -> Result<(), Bo
         fs::create_dir_all(&settings.install_dir)?;
     }
 
-    let jar_path = settings.install_dir.join("velocity.jar");
+    let jar_name = jar_filename_from_url(&settings.version.url, &settings.version.version);
+    let jar_path = settings.install_dir.join(&jar_name);
     println!("ダウンロード中: {}", settings.version.url);
     download_with_sha256(client, &settings.version, &jar_path)?;
 
-    write_start_scripts(settings)?;
+    write_start_scripts(settings, &jar_name)?;
+    write_systemd_service(settings)?;
     Ok(())
 }
 
@@ -147,19 +149,19 @@ fn download_with_sha256(
     Ok(())
 }
 
-fn write_start_scripts(settings: &InstallSettings) -> Result<(), Box<dyn Error>> {
+fn write_start_scripts(settings: &InstallSettings, jar_name: &str) -> Result<(), Box<dyn Error>> {
     let sh_path = settings.install_dir.join("start.sh");
     let bat_path = settings.install_dir.join("start.bat");
 
     let sh_contents = format!(
-        "#!/usr/bin/env sh\nset -e\nDIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\ncd \"$DIR\"\nexec java -Xms{} -Xmx{} -jar \"velocity.jar\"\n",
-        settings.xms, settings.xmx
+        "#!/usr/bin/env sh\nset -e\nDIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\ncd \"$DIR\"\nexec java -Xms{} -Xmx{} -jar \"{}\"\n",
+        settings.xms, settings.xmx, jar_name
     );
     fs::write(&sh_path, sh_contents)?;
 
     let bat_contents = format!(
-        "@echo off\r\nset \"DIR=%~dp0\"\r\ncd /d \"%DIR%\"\r\njava -Xms{} -Xmx{} -jar \"velocity.jar\"\r\n",
-        settings.xms, settings.xmx
+        "@echo off\r\nset \"DIR=%~dp0\"\r\ncd /d \"%DIR%\"\r\njava -Xms{} -Xmx{} -jar \"{}\"\r\n",
+        settings.xms, settings.xmx, jar_name
     );
     fs::write(&bat_path, bat_contents)?;
 
@@ -172,4 +174,42 @@ fn write_start_scripts(settings: &InstallSettings) -> Result<(), Box<dyn Error>>
     }
 
     Ok(())
+}
+
+fn jar_filename_from_url(url: &str, version: &str) -> String {
+    if let Ok(parsed) = Url::parse(url) {
+        if let Some(name) = parsed.path_segments().and_then(|segments| segments.last()) {
+            if !name.is_empty() {
+                return name.to_string();
+            }
+        }
+    }
+    format!("velocity-{}.jar", version)
+}
+
+fn write_systemd_service(settings: &InstallSettings) -> Result<(), Box<dyn Error>> {
+    let service_path = settings.install_dir.join("velocity.service");
+    let install_dir = absolute_path(&settings.install_dir)?;
+
+    let exec_start = install_dir.join("start.sh");
+    let user = std::env::var("USER").unwrap_or_else(|_| "velocity".to_string());
+    let group = std::env::var("USER").unwrap_or_else(|_| "velocity".to_string());
+
+    let contents = format!(
+        "[Unit]\nDescription=Velocity Minecraft Proxy\nAfter=network.target\nStartLimitIntervalSec=600\nStartLimitBurst=6\n\n[Service]\nType=simple\nWorkingDirectory={}\nExecStart={}\nRestart=on-failure\nRestartSec=5s\nUser={}\nGroup={}\n\n[Install]\nWantedBy=multi-user.target\n",
+        install_dir.display(),
+        exec_start.display(),
+        user,
+        group
+    );
+    fs::write(service_path, contents)?;
+    Ok(())
+}
+
+fn absolute_path(path: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    if path.is_absolute() {
+        Ok(path.to_path_buf())
+    } else {
+        Ok(std::env::current_dir()?.join(path))
+    }
 }

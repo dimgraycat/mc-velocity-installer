@@ -50,7 +50,8 @@
 6. 実行前サマリ表示と最終確認
 7. ダウンロード → チェックサム検証 → 配置
 8. 起動スクリプト生成
-9. 完了メッセージと次の手順の案内
+9. systemd ユニットファイル生成（`velocity.service`）
+10. 完了メッセージと次の手順の案内
 
 ### 対話フロー（--setup）
 
@@ -79,18 +80,28 @@
 
 ### 生成物
 
-- `velocity.jar` : ダウンロードした本体
+- ダウンロードした jar（ファイル名はURLのものをそのまま使用）
 - `start.sh` / `start.bat` : 起動スクリプト
+- `velocity.service` : systemd 用ユニットファイル
 
-`velocity.toml` は `velocity.jar` の初回起動で生成されるため、インストール時には作成しない。
+`velocity.toml` はダウンロードした jar の初回起動で生成されるため、インストール時には作成しない。
 
 ### 起動スクリプト
 
 - `start.sh` と `start.bat` を必ず生成する
 - 実行内容は以下を基本とする（メモリ値は対話で指定）
-  - `java -Xms{min} -Xmx{max} -jar velocity.jar`
+  - `java -Xms{min} -Xmx{max} -jar {downloaded-jar}`
 - `start.sh` は実行権限を付与する
 - 既定メモリ: `-Xms256M -Xmx512M`
+
+### systemd ユニットファイル
+
+- `velocity.service` をインストール先に生成する
+- `WorkingDirectory` はインストール先ディレクトリ
+- `ExecStart` は `start.sh` を実行する
+- `User` / `Group` は実行ユーザー（環境変数 `USER`）を使う
+- ログは journald に出力する（`journalctl` で確認）
+- 起動制限は `StartLimitIntervalSec=600` / `StartLimitBurst=6`
 
 ## 実行・ビルド・検証
 

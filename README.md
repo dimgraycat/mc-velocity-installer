@@ -1,6 +1,6 @@
 # mc-velocity-installer
 
-Velocity を新規インストールする対話型CLIです。各ステップで確認を行い、`velocity.jar` と起動スクリプトを生成します。設定ファイルは初回起動で生成されます。
+Velocity を新規インストールする対話型CLIです。各ステップで確認を行い、ダウンロードした jar（ファイル名はURLのものをそのまま使用）と起動スクリプトを生成します。設定ファイルは初回起動で生成されます。
 
 ## 前提
 
@@ -33,9 +33,10 @@ cargo run -- --setup
 
 ## 生成物
 
-- `velocity.jar`
+- ダウンロードした jar（ファイル名はURLのものをそのまま使用）
 - `velocity.toml`（初回起動で生成）
 - `start.sh` / `start.bat`
+- `velocity.service`（systemd 用ユニットファイル）
 
 ## オプション
 

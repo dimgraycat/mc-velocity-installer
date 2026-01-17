@@ -1,4 +1,5 @@
 use std::io::Write;
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use httpmock::Method::GET;
@@ -10,6 +11,27 @@ fn bin_path() -> &'static str {
     env!("CARGO_BIN_EXE_mc-velocity-installer")
 }
 
+fn assert_systemd_service(install_dir: &Path) {
+    let service_path = install_dir.join("velocity.service");
+    assert!(service_path.exists());
+
+    let contents = std::fs::read_to_string(&service_path).expect("read service");
+    let user = std::env::var("USER").unwrap_or_else(|_| "velocity".to_string());
+    let group = std::env::var("USER").unwrap_or_else(|_| "velocity".to_string());
+    assert!(contents.contains("Description=Velocity Minecraft Proxy"));
+    assert!(contents.contains("StartLimitIntervalSec=600"));
+    assert!(contents.contains("StartLimitBurst=6"));
+    assert!(contents.contains(&format!("WorkingDirectory={}", install_dir.display())));
+    assert!(contents.contains(&format!(
+        "ExecStart={}",
+        install_dir.join("start.sh").display()
+    )));
+    assert!(contents.contains(&format!("User={user}")));
+    assert!(contents.contains(&format!("Group={group}")));
+    assert!(!contents.contains("StandardOutput="));
+    assert!(!contents.contains("StandardError="));
+}
+
 #[test]
 fn install_flow_downloads_jar_and_writes_scripts() {
     let temp_dir = TempDir::new().expect("temp dir");
@@ -17,9 +39,10 @@ fn install_flow_downloads_jar_and_writes_scripts() {
 
     let jar_bytes = b"velocity-jar";
     let sha256 = format!("{:x}", Sha256::digest(jar_bytes));
-    let jar_path = "/velocity.jar";
+    let jar_name = "velocity-proxy-1.0.0.jar";
+    let jar_path = format!("/{}", jar_name);
     server.mock(|when, then| {
-        when.method(GET).path(jar_path);
+        when.method(GET).path(jar_path.as_str());
         then.status(200).body(jar_bytes.as_slice());
     });
 
@@ -40,7 +63,7 @@ fn install_flow_downloads_jar_and_writes_scripts() {
     }}
   }}
 }}"#,
-        server.url(jar_path),
+        server.url(jar_path.as_str()),
         sha256
     );
     server.mock(|when, then| {
@@ -74,9 +97,16 @@ fn install_flow_downloads_jar_and_writes_scripts() {
     );
 
     let install_dir = temp_dir.path().join("velocity");
-    assert!(install_dir.join("velocity.jar").exists());
+    let jar_file = install_dir.join(jar_name);
+    assert!(jar_file.exists());
     assert!(install_dir.join("start.sh").exists());
     assert!(install_dir.join("start.bat").exists());
+
+    let sh = std::fs::read_to_string(install_dir.join("start.sh")).expect("read start.sh");
+    assert!(sh.contains(jar_name));
+    let bat = std::fs::read_to_string(install_dir.join("start.bat")).expect("read start.bat");
+    assert!(bat.contains(jar_name));
+    assert_systemd_service(&install_dir);
 }
 
 #[test]
@@ -90,9 +120,10 @@ fn install_flow_retries_inputs_and_overwrites_existing_dir() {
 
     let jar_bytes = b"velocity-jar";
     let sha256 = format!("{:x}", Sha256::digest(jar_bytes));
-    let jar_path = "/velocity.jar";
+    let jar_name = "velocity-proxy-1.0.0.jar";
+    let jar_path = format!("/{}", jar_name);
     server.mock(|when, then| {
-        when.method(GET).path(jar_path);
+        when.method(GET).path(jar_path.as_str());
         then.status(200).body(jar_bytes.as_slice());
     });
 
@@ -113,7 +144,7 @@ fn install_flow_retries_inputs_and_overwrites_existing_dir() {
     }}
   }}
 }}"#,
-        server.url(jar_path),
+        server.url(jar_path.as_str()),
         sha256
     );
     server.mock(|when, then| {
@@ -150,7 +181,8 @@ fn install_flow_retries_inputs_and_overwrites_existing_dir() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    assert!(velocity_dir.join("velocity.jar").exists());
+    assert!(velocity_dir.join(jar_name).exists());
     assert!(velocity_dir.join("start.sh").exists());
     assert!(velocity_dir.join("start.bat").exists());
+    assert_systemd_service(&velocity_dir);
 }

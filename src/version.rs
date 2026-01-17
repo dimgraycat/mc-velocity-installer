@@ -95,7 +95,7 @@ mod tests {
   "status": "ok",
   "data": {
     "1.2.3": {
-      "url": "http://example.invalid/velocity.jar",
+      "url": "http://example.invalid/velocity-proxy-1.2.3.jar",
       "checksum": {
         "sha1": null,
         "sha256": null
