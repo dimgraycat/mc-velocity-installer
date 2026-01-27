@@ -14,19 +14,11 @@ Velocity を新規インストールする対話型CLIです。各ステップ�
 cargo run
 ```
 
-`velocity.toml` の設定変更:
-
-```bash
-cargo run -- --setup
-```
-
 jar のみ再取得:
 
 ```bash
 cargo run -- --redownload-jar
 ```
-
-変更がある場合は保存前に変更点を表示します。
 
 ### 対話の流れ（概要）
 
@@ -40,13 +32,11 @@ cargo run -- --redownload-jar
 ## 生成物
 
 - ダウンロードした jar（ファイル名はURLのものをそのまま使用）
-- `velocity.toml`（初回起動で生成）
 - `start.sh` / `start.bat`
 - `velocity.service`（systemd 用ユニットファイル）
 
 ## オプション
 
-- `--setup` で `velocity.toml` を対話式に編集できます（項目ごとにスキップ/削除が可能）。
 - `--redownload-jar` は jar のみ再取得します（start.sh / start.bat の置き換えは確認後に実行）。
 - `--update` は未対応です。指定された場合は案内メッセージを出して終了します。
 - `-h, --help` でヘルプを表示します。

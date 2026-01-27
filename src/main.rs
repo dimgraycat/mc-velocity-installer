@@ -7,13 +7,11 @@ use reqwest::{Url, blocking::Client};
 use sha2::{Digest, Sha256};
 
 mod prompts;
-mod setup;
 mod version;
 
 use prompts::{
     confirm_existing_install, prompt_install_dir, prompt_memory, prompt_version, prompt_yes_no,
 };
-use setup::run_setup;
 use version::{VERSION_INDEX_URL, VersionInfo, fetch_versions};
 
 #[derive(Debug)]
@@ -39,10 +37,6 @@ fn run() -> Result<(), Box<dyn Error>> {
     }
     if args.iter().any(|arg| arg == "--version" || arg == "-V") {
         print_version();
-        return Ok(());
-    }
-    if args.iter().any(|arg| arg == "--setup") {
-        run_setup()?;
         return Ok(());
     }
     if args.iter().any(|arg| arg == "--redownload-jar") {
@@ -105,7 +99,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn print_help() {
     let name = binary_name();
     println!(
-        "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --setup            velocity.toml を対話式に編集します\n  --redownload-jar   jar を再取得します（必要ならスクリプト置き換え）\n  --update           未対応（新規インストールのみ対応）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
+        "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --redownload-jar   jar を再取得します（必要ならスクリプト置き換え）\n  --update           未対応（新規インストールのみ対応）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
         build_version(),
     );
 }
