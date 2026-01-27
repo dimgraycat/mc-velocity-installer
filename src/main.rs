@@ -126,10 +126,7 @@ fn print_summary(settings: &InstallSettings) {
     println!();
     println!("設定サマリ:");
     println!("- インストール先: {}", settings.install_dir.display());
-    println!(
-        "- バージョン: {} ({})",
-        settings.version.version, settings.version.kind
-    );
+    println!("- バージョン: {}", settings.version.display_label());
     println!("- 起動メモリ: Xms={} / Xmx={}", settings.xms, settings.xmx);
     println!("- 設定ファイルは初回起動時に生成されます");
 }
@@ -138,7 +135,7 @@ fn print_redownload_summary(install_dir: &Path, version: &VersionInfo, jar_name:
     println!();
     println!("設定サマリ:");
     println!("- インストール先: {}", install_dir.display());
-    println!("- バージョン: {} ({})", version.version, version.kind);
+    println!("- バージョン: {}", version.display_label());
     println!("- 再取得する jar: {jar_name}");
     println!("- 既存スクリプトの置き換え可否は後で確認します");
 }
