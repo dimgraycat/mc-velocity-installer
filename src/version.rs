@@ -18,6 +18,7 @@ struct VelocityEntry {
     checksum: Checksum,
     #[serde(rename = "type")]
     kind: String,
+    build: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,6 +32,28 @@ pub struct VersionInfo {
     pub kind: String,
     pub url: String,
     pub sha256: String,
+    pub build: Option<u64>,
+}
+
+impl VersionInfo {
+    pub fn display_label(&self) -> String {
+        let kind = colorize_kind(&self.kind);
+        match self.build {
+            Some(build) => format!("{} ({}, build {})", self.version, kind, build),
+            None => format!("{} ({})", self.version, kind),
+        }
+    }
+}
+
+fn colorize_kind(kind: &str) -> String {
+    if std::env::var_os("NO_COLOR").is_some() {
+        return kind.to_string();
+    }
+    match kind {
+        "stable" => format!("\x1b[32m{}\x1b[0m", kind),
+        "beta" => format!("\x1b[31m{}\x1b[0m", kind),
+        _ => kind.to_string(),
+    }
 }
 
 pub fn fetch_versions(client: &Client, url: &str) -> Result<Vec<VersionInfo>, Box<dyn Error>> {
@@ -53,6 +76,7 @@ pub fn fetch_versions(client: &Client, url: &str) -> Result<Vec<VersionInfo>, Bo
             kind: entry.kind,
             url: entry.url,
             sha256,
+            build: entry.build,
         });
     }
 

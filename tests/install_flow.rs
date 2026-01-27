@@ -236,7 +236,7 @@ fn redownload_jar_only_downloads_jar() {
         .spawn()
         .expect("spawn");
 
-    let input = "\n\n\n\n\n";
+    let input = "\n\n\n\n\n\n";
     child
         .stdin
         .as_mut()
@@ -257,4 +257,182 @@ fn redownload_jar_only_downloads_jar() {
     assert!(!install_dir.join("start.sh").exists());
     assert!(!install_dir.join("start.bat").exists());
     assert!(!install_dir.join("velocity.service").exists());
+}
+
+#[test]
+fn redownload_jar_can_replace_start_scripts() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let server = MockServer::start();
+
+    let jar_bytes = b"velocity-jar";
+    let sha256 = format!("{:x}", Sha256::digest(jar_bytes));
+    let jar_name = "velocity-proxy-1.1.0.jar";
+    let jar_path = format!("/{}", jar_name);
+    server.mock(|when, then| {
+        when.method(GET).path(jar_path.as_str());
+        then.status(200).body(jar_bytes.as_slice());
+    });
+
+    let index_body = format!(
+        r#"{{
+  "status": "ok",
+  "platform": "velocity",
+  "type": "proxy",
+  "data": {{
+    "1.1.0": {{
+      "url": "{}",
+      "checksum": {{
+        "sha1": null,
+        "sha256": "{}"
+      }},
+      "build": 1,
+      "type": "stable"
+    }}
+  }}
+}}"#,
+        server.url(jar_path.as_str()),
+        sha256
+    );
+    server.mock(|when, then| {
+        when.method(GET).path("/velocity.json");
+        then.status(200).body(index_body);
+    });
+
+    let install_dir = temp_dir.path().join("velocity");
+    std::fs::create_dir_all(&install_dir).expect("create install dir");
+    std::fs::write(
+        install_dir.join("start.sh"),
+        "#!/usr/bin/env sh\nexec java -Xms512M -Xmx1G -jar \"old.jar\"\n",
+    )
+    .expect("write start.sh");
+    std::fs::write(
+        install_dir.join("start.bat"),
+        "@echo off\r\njava -Xms512M -Xmx1G -jar \"old.jar\"\r\n",
+    )
+    .expect("write start.bat");
+
+    let mut child = Command::new(bin_path())
+        .arg("--redownload-jar")
+        .current_dir(temp_dir.path())
+        .env("MC_VELOCITY_INDEX_URL", server.url("/velocity.json"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+
+    let inputs = ["", "", "y", "", "", "", "y"];
+    let input_blob = inputs.join("\n") + "\n";
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(input_blob.as_bytes())
+        .expect("write stdin");
+
+    let output = child.wait_with_output().expect("wait");
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(install_dir.join(jar_name).exists());
+    let sh_contents = std::fs::read_to_string(install_dir.join("start.sh")).expect("read sh");
+    assert!(sh_contents.contains("-Xms512M"));
+    assert!(sh_contents.contains("-Xmx1G"));
+    assert!(sh_contents.contains(jar_name));
+    let bat_contents = std::fs::read_to_string(install_dir.join("start.bat")).expect("read bat");
+    assert!(bat_contents.contains("-Xms512M"));
+    assert!(bat_contents.contains("-Xmx1G"));
+    assert!(bat_contents.contains(jar_name));
+}
+
+#[test]
+fn deploy_copies_assets_and_updates_service() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let install_dir = temp_dir.path().join("velocity");
+    std::fs::create_dir_all(&install_dir).expect("create install dir");
+
+    let jar_name = "velocity-proxy-1.0.0.jar";
+    std::fs::write(install_dir.join(jar_name), b"jar bytes").expect("write jar");
+
+    std::fs::write(
+        install_dir.join("start.sh"),
+        format!(
+            "#!/usr/bin/env sh\ncd \"{}\"\njava -Xms256M -Xmx512M -jar \"{}\"\n",
+            install_dir.display(),
+            jar_name
+        ),
+    )
+    .expect("write start.sh");
+    std::fs::write(
+        install_dir.join("start.bat"),
+        format!(
+            "@echo off\r\ncd /d \"{}\"\r\njava -Xms256M -Xmx512M -jar \"{}\"\r\n",
+            install_dir.display(),
+            jar_name
+        ),
+    )
+    .expect("write start.bat");
+
+    let user = std::env::var("USER").unwrap_or_else(|_| "velocity".to_string());
+    let group = std::env::var("USER").unwrap_or_else(|_| "velocity".to_string());
+    let service_contents = format!(
+        "[Unit]\nDescription=Velocity Minecraft Proxy\nAfter=network.target\nStartLimitIntervalSec=600\nStartLimitBurst=6\n\n[Service]\nType=simple\nWorkingDirectory={}\nExecStart={}\nRestart=on-failure\nRestartSec=5s\nUser={}\nGroup={}\n\n[Install]\nWantedBy=multi-user.target\n",
+        install_dir.display(),
+        install_dir.join("start.sh").display(),
+        user,
+        group
+    );
+    std::fs::write(install_dir.join("velocity.service"), service_contents)
+        .expect("write velocity.service");
+
+    std::fs::write(install_dir.join("velocity.toml"), "source")
+        .expect("write velocity.toml");
+
+    let deploy_dir = temp_dir.path().join("deploy");
+    std::fs::create_dir_all(&deploy_dir).expect("create deploy dir");
+    std::fs::write(deploy_dir.join("velocity.toml"), "dest").expect("write dest toml");
+
+    let mut child = Command::new(bin_path())
+        .arg("--deploy")
+        .arg(&deploy_dir)
+        .current_dir(temp_dir.path())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+
+    let inputs = ["", "", "y"];
+    let input_blob = inputs.join("\n") + "\n";
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(input_blob.as_bytes())
+        .expect("write stdin");
+
+    let output = child.wait_with_output().expect("wait");
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    if cfg!(windows) {
+        assert!(deploy_dir.join("start.bat").exists());
+        assert!(!deploy_dir.join("start.sh").exists());
+    } else {
+        assert!(deploy_dir.join("start.sh").exists());
+        assert!(!deploy_dir.join("start.bat").exists());
+    }
+    assert!(deploy_dir.join(jar_name).exists());
+    assert_systemd_service(&deploy_dir);
+    let toml_contents =
+        std::fs::read_to_string(deploy_dir.join("velocity.toml")).expect("read toml");
+    assert_eq!(toml_contents, "source");
 }

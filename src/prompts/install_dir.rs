@@ -25,6 +25,26 @@ pub(crate) fn prompt_install_dir() -> io::Result<PathBuf> {
     }
 }
 
+pub(crate) fn prompt_deploy_source_dir() -> io::Result<PathBuf> {
+    let default_dir = default_install_dir();
+    let default_display = default_dir.to_string_lossy();
+    loop {
+        let input = prompt_with_default("デプロイ元ディレクトリ", &default_display)?;
+        let path = PathBuf::from(input);
+        if path.as_os_str().is_empty() {
+            println!("空のパスは指定できません。");
+            continue;
+        }
+        let confirm = prompt_yes_no(
+            &format!("デプロイ元は {} でよいですか？", path.display()),
+            true,
+        )?;
+        if confirm {
+            return Ok(path);
+        }
+    }
+}
+
 pub(crate) fn confirm_existing_install(path: &Path) -> Result<bool, Box<dyn Error>> {
     if path.exists() {
         if !path.is_dir() {

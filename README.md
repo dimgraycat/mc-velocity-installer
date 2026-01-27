@@ -14,25 +14,23 @@ Velocity を新規インストールする対話型CLIです。各ステップ�
 cargo run
 ```
 
-`velocity.toml` の設定変更:
-
-```bash
-cargo run -- --setup
-```
-
 jar のみ再取得:
 
 ```bash
 cargo run -- --redownload-jar
 ```
 
-変更がある場合は保存前に変更点を表示します。
+指定先へデプロイ:
+
+```bash
+cargo run -- --deploy /path/to/deploy
+```
 
 ### 対話の流れ（概要）
 
 1. インストール先の指定（既定: 実行時のカレントディレクトリ/velocity）
 2. 既存ファイルの有無確認（上書き可否）
-3. Velocity バージョン一覧の表示と選択（`バージョン (type)` 形式）
+3. Velocity バージョン一覧の表示と選択（`バージョン (type, build)` 形式）
 4. 起動メモリ（Xms/Xmx）の入力（既定: 256M/512M）
 5. サマリ確認後、ダウンロードと生成
 6. 初回起動で `velocity.toml` を生成（生成後に設定を編集）
@@ -40,15 +38,13 @@ cargo run -- --redownload-jar
 ## 生成物
 
 - ダウンロードした jar（ファイル名はURLのものをそのまま使用）
-- `velocity.toml`（初回起動で生成）
 - `start.sh` / `start.bat`
 - `velocity.service`（systemd 用ユニットファイル）
 
 ## オプション
 
-- `--setup` で `velocity.toml` を対話式に編集できます（項目ごとにスキップ/削除が可能）。
-- `--redownload-jar` は jar のみ再取得します（スクリプトや設定は変更しません）。
-- `--update` は未対応です。指定された場合は案内メッセージを出して終了します。
+- `--deploy <DIR>` は指定先へデプロイします。
+- `--redownload-jar` は jar のみ再取得します（start.sh / start.bat の置き換えは確認後に実行）。
 - `-h, --help` でヘルプを表示します。
 - `-V, --version` でバージョンを表示します。
 
