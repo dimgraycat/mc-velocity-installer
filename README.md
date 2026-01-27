@@ -38,7 +38,6 @@ cargo run -- --redownload-jar
 ## オプション
 
 - `--redownload-jar` は jar のみ再取得します（start.sh / start.bat の置き換えは確認後に実行）。
-- `--update` は未対応です。指定された場合は案内メッセージを出して終了します。
 - `-h, --help` でヘルプを表示します。
 - `-V, --version` でバージョンを表示します。
 

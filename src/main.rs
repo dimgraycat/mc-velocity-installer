@@ -43,11 +43,6 @@ fn run() -> Result<(), Box<dyn Error>> {
         run_redownload_jar()?;
         return Ok(());
     }
-    if args.iter().any(|arg| arg == "--update") {
-        println!("アップデート機能は未対応です。新規インストールのみ対応しています。");
-        return Ok(());
-    }
-
     println!("{} (新規インストール)", binary_name());
     println!("Java はインストール済みであることを前提に進めます。");
     println!();
@@ -99,8 +94,8 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn print_help() {
     let name = binary_name();
     println!(
-        "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --redownload-jar   jar を再取得します（必要ならスクリプト置き換え）\n  --update           未対応（新規インストールのみ対応）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
-        build_version(),
+        "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --redownload-jar   jar を再取得します（必要ならスクリプト置き換え）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
+        build_version()
     );
 }
 

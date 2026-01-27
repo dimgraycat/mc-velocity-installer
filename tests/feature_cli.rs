@@ -5,18 +5,6 @@ fn bin_path() -> &'static str {
 }
 
 #[test]
-fn update_flag_shows_message() {
-    let output = Command::new(bin_path())
-        .arg("--update")
-        .output()
-        .expect("run binary");
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("未対応"));
-}
-
-#[test]
 fn help_shows_usage() {
     let output = Command::new(bin_path())
         .arg("--help")
