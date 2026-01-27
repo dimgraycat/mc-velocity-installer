@@ -26,6 +26,7 @@
 ### モードと引数
 
 - 新規インストールのみ対応（引数なしで起動）
+- `--deploy <DIR>` は指定先へデプロイする
 - `--redownload-jar` は jar のみ再取得する
   - 既存の設定は変更しない
   - start.sh / start.bat は置き換えるかどうかを確認する
@@ -62,6 +63,14 @@
 4. 再取得サマリ表示と最終確認
 5. ダウンロード → チェックサム検証 → 配置
 6. start.sh / start.bat の置き換え確認（必要な場合はメモリ値を入力）
+
+### 対話フロー（--deploy）
+
+1. インストール元ディレクトリの指定（既定: 実行時のカレントディレクトリ/velocity）
+2. start.sh / start.bat のコピー（OS により選択）
+3. start スクリプトが参照する jar をコピー
+4. velocity.service をコピーし、WorkingDirectory / ExecStart をデプロイ先に更新
+5. velocity.toml が存在する場合にコピー（デプロイ先にある場合は上書き確認）
 
 ### 主要設定項目
 

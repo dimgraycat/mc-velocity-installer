@@ -20,6 +20,12 @@ jar のみ再取得:
 cargo run -- --redownload-jar
 ```
 
+指定先へデプロイ:
+
+```bash
+cargo run -- --deploy /path/to/deploy
+```
+
 ### 対話の流れ（概要）
 
 1. インストール先の指定（既定: 実行時のカレントディレクトリ/velocity）
@@ -37,6 +43,7 @@ cargo run -- --redownload-jar
 
 ## オプション
 
+- `--deploy <DIR>` は指定先へデプロイします。
 - `--redownload-jar` は jar のみ再取得します（start.sh / start.bat の置き換えは確認後に実行）。
 - `-h, --help` でヘルプを表示します。
 - `-V, --version` でバージョンを表示します。

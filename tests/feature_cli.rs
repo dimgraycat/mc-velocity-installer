@@ -14,6 +14,7 @@ fn help_shows_usage() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("使い方"));
+    assert!(stdout.contains("--deploy"));
     assert!(stdout.contains("--redownload-jar"));
 }
 
