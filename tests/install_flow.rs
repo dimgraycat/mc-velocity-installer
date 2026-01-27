@@ -236,7 +236,7 @@ fn redownload_jar_only_downloads_jar() {
         .spawn()
         .expect("spawn");
 
-    let input = "\n\n\n\n\n";
+    let input = "\n\n\n\n\n\n";
     child
         .stdin
         .as_mut()
@@ -257,4 +257,94 @@ fn redownload_jar_only_downloads_jar() {
     assert!(!install_dir.join("start.sh").exists());
     assert!(!install_dir.join("start.bat").exists());
     assert!(!install_dir.join("velocity.service").exists());
+}
+
+#[test]
+fn redownload_jar_can_replace_start_scripts() {
+    let temp_dir = TempDir::new().expect("temp dir");
+    let server = MockServer::start();
+
+    let jar_bytes = b"velocity-jar";
+    let sha256 = format!("{:x}", Sha256::digest(jar_bytes));
+    let jar_name = "velocity-proxy-1.1.0.jar";
+    let jar_path = format!("/{}", jar_name);
+    server.mock(|when, then| {
+        when.method(GET).path(jar_path.as_str());
+        then.status(200).body(jar_bytes.as_slice());
+    });
+
+    let index_body = format!(
+        r#"{{
+  "status": "ok",
+  "platform": "velocity",
+  "type": "proxy",
+  "data": {{
+    "1.1.0": {{
+      "url": "{}",
+      "checksum": {{
+        "sha1": null,
+        "sha256": "{}"
+      }},
+      "build": 1,
+      "type": "stable"
+    }}
+  }}
+}}"#,
+        server.url(jar_path.as_str()),
+        sha256
+    );
+    server.mock(|when, then| {
+        when.method(GET).path("/velocity.json");
+        then.status(200).body(index_body);
+    });
+
+    let install_dir = temp_dir.path().join("velocity");
+    std::fs::create_dir_all(&install_dir).expect("create install dir");
+    std::fs::write(
+        install_dir.join("start.sh"),
+        "#!/usr/bin/env sh\nexec java -Xms512M -Xmx1G -jar \"old.jar\"\n",
+    )
+    .expect("write start.sh");
+    std::fs::write(
+        install_dir.join("start.bat"),
+        "@echo off\r\njava -Xms512M -Xmx1G -jar \"old.jar\"\r\n",
+    )
+    .expect("write start.bat");
+
+    let mut child = Command::new(bin_path())
+        .arg("--redownload-jar")
+        .current_dir(temp_dir.path())
+        .env("MC_VELOCITY_INDEX_URL", server.url("/velocity.json"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn");
+
+    let inputs = ["", "", "y", "", "", "", "y"];
+    let input_blob = inputs.join("\n") + "\n";
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(input_blob.as_bytes())
+        .expect("write stdin");
+
+    let output = child.wait_with_output().expect("wait");
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    assert!(install_dir.join(jar_name).exists());
+    let sh_contents = std::fs::read_to_string(install_dir.join("start.sh")).expect("read sh");
+    assert!(sh_contents.contains("-Xms512M"));
+    assert!(sh_contents.contains("-Xmx1G"));
+    assert!(sh_contents.contains(jar_name));
+    let bat_contents = std::fs::read_to_string(install_dir.join("start.bat")).expect("read bat");
+    assert!(bat_contents.contains("-Xms512M"));
+    assert!(bat_contents.contains("-Xmx1G"));
+    assert!(bat_contents.contains(jar_name));
 }

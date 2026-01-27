@@ -105,7 +105,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn print_help() {
     let name = binary_name();
     println!(
-        "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --setup            velocity.toml を対話式に編集します\n  --redownload-jar   jar のみ再取得します\n  --update           未対応（新規インストールのみ対応）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
+        "{name} {}\n\n使い方:\n  {name} [OPTIONS]\n\nOPTIONS:\n  --setup            velocity.toml を対話式に編集します\n  --redownload-jar   jar を再取得します（必要ならスクリプト置き換え）\n  --update           未対応（新規インストールのみ対応）\n  -h, --help         ヘルプを表示します\n  -V, --version      バージョンを表示します\n\n詳細・更新情報:\n  ドキュメントや最新の変更点は以下で確認できます。\n  https://github.com/dimgraycat/mc-velocity-installer\n",
         build_version(),
     );
 }
@@ -151,7 +151,7 @@ fn print_redownload_summary(install_dir: &Path, version: &VersionInfo, jar_name:
     println!("- インストール先: {}", install_dir.display());
     println!("- バージョン: {} ({})", version.version, version.kind);
     println!("- 再取得する jar: {jar_name}");
-    println!("- 既存のスクリプトや設定は変更しません");
+    println!("- 既存スクリプトの置き換え可否は後で確認します");
 }
 
 fn perform_install(client: &Client, settings: &InstallSettings) -> Result<(), Box<dyn Error>> {
@@ -164,7 +164,12 @@ fn perform_install(client: &Client, settings: &InstallSettings) -> Result<(), Bo
     println!("ダウンロード中: {}", settings.version.url);
     download_with_sha256(client, &settings.version, &jar_path)?;
 
-    write_start_scripts(settings, &jar_name)?;
+    write_start_scripts(
+        &settings.install_dir,
+        &settings.xms,
+        &settings.xmx,
+        &jar_name,
+    )?;
     write_systemd_service(settings)?;
     Ok(())
 }
@@ -201,6 +206,15 @@ fn run_redownload_jar() -> Result<(), Box<dyn Error>> {
     let jar_path = install_dir.join(&jar_name);
     println!("ダウンロード中: {}", version.url);
     download_with_sha256(&client, &version, &jar_path)?;
+    let replace_scripts = prompt_yes_no("start.sh / start.bat を置き換えますか？", false)?;
+    if replace_scripts {
+        let (xms, xmx) = match detect_existing_memory(&install_dir)? {
+            Some(values) => values,
+            None => prompt_memory()?,
+        };
+        write_start_scripts(&install_dir, &xms, &xmx, &jar_name)?;
+        println!("start.sh / start.bat を更新しました。");
+    }
     println!();
     println!("完了しました。");
     Ok(())
@@ -242,19 +256,24 @@ fn build_client() -> Result<Client, Box<dyn Error>> {
         .build()?)
 }
 
-fn write_start_scripts(settings: &InstallSettings, jar_name: &str) -> Result<(), Box<dyn Error>> {
-    let sh_path = settings.install_dir.join("start.sh");
-    let bat_path = settings.install_dir.join("start.bat");
+fn write_start_scripts(
+    install_dir: &Path,
+    xms: &str,
+    xmx: &str,
+    jar_name: &str,
+) -> Result<(), Box<dyn Error>> {
+    let sh_path = install_dir.join("start.sh");
+    let bat_path = install_dir.join("start.bat");
 
     let sh_contents = format!(
         "#!/usr/bin/env sh\nset -e\nDIR=\"$(cd \"$(dirname \"$0\")\" && pwd)\"\ncd \"$DIR\"\nexec java -Xms{} -Xmx{} -jar \"{}\"\n",
-        settings.xms, settings.xmx, jar_name
+        xms, xmx, jar_name
     );
     fs::write(&sh_path, sh_contents)?;
 
     let bat_contents = format!(
         "@echo off\r\nset \"DIR=%~dp0\"\r\ncd /d \"%DIR%\"\r\njava -Xms{} -Xmx{} -jar \"{}\"\r\n",
-        settings.xms, settings.xmx, jar_name
+        xms, xmx, jar_name
     );
     fs::write(&bat_path, bat_contents)?;
 
@@ -278,6 +297,61 @@ fn jar_filename_from_url(url: &str, version: &str) -> String {
         }
     }
     format!("velocity-{}.jar", version)
+}
+
+fn detect_existing_memory(install_dir: &Path) -> Result<Option<(String, String)>, Box<dyn Error>> {
+    let sh_path = install_dir.join("start.sh");
+    if let Some(values) = read_memory_from_script(&sh_path)? {
+        return Ok(Some(values));
+    }
+    let bat_path = install_dir.join("start.bat");
+    if let Some(values) = read_memory_from_script(&bat_path)? {
+        return Ok(Some(values));
+    }
+    Ok(None)
+}
+
+fn read_memory_from_script(path: &Path) -> Result<Option<(String, String)>, Box<dyn Error>> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let contents = fs::read_to_string(path)?;
+    Ok(extract_memory_flags(&contents))
+}
+
+fn extract_memory_flags(contents: &str) -> Option<(String, String)> {
+    let mut xms: Option<String> = None;
+    let mut xmx: Option<String> = None;
+    let mut iter = contents.split_whitespace().peekable();
+    while let Some(token) = iter.next() {
+        if token == "-Xms" {
+            if let Some(value) = iter.next() {
+                xms = Some(value.trim_matches('"').to_string());
+            }
+            continue;
+        }
+        if token == "-Xmx" {
+            if let Some(value) = iter.next() {
+                xmx = Some(value.trim_matches('"').to_string());
+            }
+            continue;
+        }
+        if let Some(value) = token.strip_prefix("-Xms") {
+            if !value.is_empty() {
+                xms = Some(value.trim_matches('"').to_string());
+            }
+            continue;
+        }
+        if let Some(value) = token.strip_prefix("-Xmx") {
+            if !value.is_empty() {
+                xmx = Some(value.trim_matches('"').to_string());
+            }
+        }
+    }
+    match (xms, xmx) {
+        (Some(xms), Some(xmx)) => Some((xms, xmx)),
+        _ => None,
+    }
 }
 
 fn write_systemd_service(settings: &InstallSettings) -> Result<(), Box<dyn Error>> {
